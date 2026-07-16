@@ -1,13 +1,22 @@
-const OpenAI = require("openai");
+const Groq = require("groq-sdk");
+const { pipeline } = require("@xenova/transformers");
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+let embedder = null;
+
+async function getEmbedder() {
+  if (!embedder) {
+    console.log("Loading embedding model (first time only)...");
+    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+  }
+  return embedder;
+}
 
 async function embed(text) {
-  const res = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  return res.data[0].embedding;
+  const embedder = await getEmbedder();
+  const result = await embedder(text, { pooling: "mean", normalize: true });
+  return Array.from(result.data);
 }
 
 function cosineSimilarity(a, b) {
@@ -17,4 +26,15 @@ function cosineSimilarity(a, b) {
   return dot / (magA * magB);
 }
 
-module.exports = { embed, cosineSimilarity };
+async function chat(systemPrompt, userMessage) {
+  const res = await groq.chat.completions.create({
+    model: "llama-3.1-8b-instant",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+  });
+  return res.choices[0].message.content;
+}
+
+module.exports = { embed, cosineSimilarity, chat };

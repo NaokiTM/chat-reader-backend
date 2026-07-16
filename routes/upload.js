@@ -5,28 +5,34 @@ const { chunkText } = require("../chunker");
 const { embed } = require("../embeddings");
 const crypto = require("crypto");
 
-router.post("/", express.json({ limit: "50mb" }), async (req, res) => {
+=router.post("/", async (req, res) => {
   try {
     const { bookId, chapters } = req.body;
-    // chapters = [{ index: 0, text: "..." }, ...]
+    console.log("Upload received, bookId:", bookId, "chapters:", chapters?.length);
 
+    db.prepare("DELETE FROM chunks WHERE bookId = ?").run(bookId);
+
+    let total = 0;
     for (const chapter of chapters) {
+      console.log("Processing chapter", chapter.index);
       const chunks = chunkText(chapter.text);
+      console.log("Chunks:", chunks.length);
       for (const chunk of chunks) {
         const id = crypto.randomUUID();
-        // embedding will go here once we have the API key
+        const embedding = await embed(chunk);
         db.prepare(`
           INSERT INTO chunks (id, bookId, chapterIndex, content, embedding)
           VALUES (?, ?, ?, ?, ?)
-        `).run(id, bookId, chapter.index, chunk, null);
+        `).run(id, bookId, chapter.index, chunk, JSON.stringify(embedding));
+        total++;
       }
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, chunks: total });
   } catch (e) {
-    console.error(e);
+    console.error("Upload error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-module.exports = router;
+module.exports = router
