@@ -5,14 +5,14 @@ const { chunkText } = require("../chunker");
 const { embed } = require("../embeddings");
 const crypto = require("crypto");
 
-=router.post("/", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { bookId, chapters } = req.body;
     console.log("Upload received, bookId:", bookId, "chapters:", chapters?.length);
 
     db.prepare("DELETE FROM chunks WHERE bookId = ?").run(bookId);
 
-    let total = 0;
+    let total = 0; 
     for (const chapter of chapters) {
       console.log("Processing chapter", chapter.index);
       const chunks = chunkText(chapter.text);
